@@ -8,13 +8,16 @@ RUN npm run build
 
 # production stage
 FROM nginx:stable-alpine as production-stage
+ARG PORT
+ENV PORT=$PORT
 
-ARG PORT=80
-ENV PORT $PORT
-COPY --from=build-stage /app/dist /usr/share/nginx/html
+WORKDIR /usr/share/nginx/html
+COPY --from=build-stage /app/dist .
 
-# create nginx.conf file
-RUN echo "server { listen \$PORT default_server; root /usr/share/nginx/html; }" > /etc/nginx/conf.d/default.conf
+# Create an template of Nginx configuration file that uses PORT 
+RUN echo "server { listen \$PORT default_server; root /usr/share/nginx/html; }" > /etc/nginx/conf.d/default.conf.template
 
 EXPOSE $PORT
-CMD ["nginx", "-g", "daemon off;"]
+
+# At container startup, replace the $PORT in the configuration file with the current PORT then start Nginx
+CMD /bin/sh -c "envsubst '\$PORT' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf" && nginx -g 'daemon off;'
